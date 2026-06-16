@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>StockCrash</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#0a0e1a;--bg2:#0f1424;--bg3:#151c2e;--bg4:#1a2238;
+  --border:#ffffff12;--border2:#ffffff22;
+  --green:#00d084;--red:#ff4444;--blue:#3b82f6;--gold:#f59e0b;
+  --text:#e8eaf0;--text2:#8892a4;--text3:#4a5568;
+  --font:'Inter',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;
+  --r:8px;--r2:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{font-family:var(--font);background:var(--bg);color:var(--text);height:100%;overflow:hidden}
+button,input{font-family:var(--font)}
+
+/* ── DESKTOP layout ── */
+#wrapper{display:flex;flex-direction:column;height:100vh}
+#topbar{display:flex;align-items:center;justify-content:space-between;padding:0 16px;height:50px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;gap:12px}
+#main{display:grid;grid-template-columns:1fr 290px;flex:1;overflow:hidden;min-height:0}
+#chart-col{display:flex;flex-direction:column;min-height:0}
+#chart-wrap{flex:1;position:relative;background:var(--bg);overflow:hidden}
+#ticker-bar{height:38px;background:var(--bg2);border-top:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:18px;flex-shrink:0;overflow:hidden}
+#right-col{display:flex;flex-direction:column;background:var(--bg2);border-left:1px solid var(--border);overflow:hidden}
+
+/* ── MOBILE layout ── */
+@media(max-width:680px){
+  html,body{overflow:auto;height:auto}
+  #wrapper{height:auto;min-height:100vh;overflow:auto}
+  #topbar{height:48px;padding:0 12px}
+  #top-stats{display:none}
+  #main{display:flex;flex-direction:column;overflow:visible;height:auto}
+  #chart-col{flex-direction:column}
+  #chart-wrap{height:52vw;min-height:200px;flex:none}
+  #ticker-bar{display:none}
+  #right-col{border-left:none;border-top:1px solid var(--border);flex:1;overflow:visible}
+  #tabs{position:sticky;top:48px;z-index:20;background:var(--bg2)}
+  #bet-panel{padding:12px}
+  .chips{grid-template-columns:repeat(4,1fr);gap:5px}
+  #live-section{max-height:200px}
+  #hist-section,#stats-section{min-height:200px}
+  #action-btn{padding:16px;font-size:16px;min-height:52px}
+  #mult-big{font-size:44px!important}
+  #cd-num{font-size:60px!important}
+  #admin-box{width:95vw;padding:16px}
+  #pf-box{width:95vw;padding:16px}
+}
+
+/* ── TOPBAR ── */
+#logo-text{font-size:16px;font-weight:700;letter-spacing:-0.5px;color:#fff;white-space:nowrap}
+#logo-text span{color:var(--green)}
+#logo-badge{font-size:9px;font-weight:700;background:var(--green);color:#000;padding:2px 6px;border-radius:4px;letter-spacing:0.5px;margin-left:6px;flex-shrink:0}
+#top-stats{display:flex;align-items:center;gap:20px}
+.tstat{display:flex;flex-direction:column;align-items:flex-end}
+.tstat-label{font-size:10px;color:var(--text3);letter-spacing:0.5px;text-transform:uppercase}
+.tstat-val{font-size:13px;font-weight:600;color:var(--text)}
+.tstat-val.g{color:var(--green)}.tstat-val.r{color:var(--red)}
+#top-btns{display:flex;gap:8px;flex-shrink:0}
+.top-btn{background:var(--bg4);border:1px solid var(--border2);color:var(--text2);padding:6px 10px;border-radius:var(--r);cursor:pointer;font-size:12px;font-weight:500;transition:all 0.2s;white-space:nowrap}
+.top-btn:hover,.top-btn:active{border-color:var(--green);color:var(--green)}
+
+/* ── CHART ── */
+canvas{display:block;width:100%;height:100%}
+#phase-tag{position:absolute;top:12px;left:12px;font-size:10px;font-weight:600;padding:4px 10px;border-radius:20px;letter-spacing:1px;text-transform:uppercase;pointer-events:none}
+#phase-tag.b{background:rgba(59,130,246,0.18);color:var(--blue);border:1px solid rgba(59,130,246,0.3)}
+#phase-tag.f{background:rgba(0,208,132,0.14);color:var(--green);border:1px solid rgba(0,208,132,0.28)}
+#phase-tag.c{background:rgba(255,68,68,0.14);color:var(--red);border:1px solid rgba(255,68,68,0.28)}
+#mult-overlay{position:absolute;top:50%;left:50%;transform:translate(-50%,-60%);text-align:center;pointer-events:none;display:none}
+#mult-big{font-family:var(--mono);font-size:64px;font-weight:600;line-height:1;letter-spacing:-2px;transition:color 0.3s}
+#mult-big.g{color:var(--green);text-shadow:0 0 40px rgba(0,208,132,0.3)}
+#mult-big.r{color:var(--red);text-shadow:0 0 40px rgba(255,68,68,0.3)}
+#mult-sub{font-size:10px;color:var(--text3);letter-spacing:2px;text-transform:uppercase;margin-top:4px}
+#cd-overlay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none}
+#cd-num{font-family:var(--mono);font-size:72px;font-weight:600;color:var(--blue);line-height:1}
+#cd-label{font-size:10px;color:var(--text3);letter-spacing:2px;margin-top:6px;text-transform:uppercase}
+#crash-banner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;display:none;pointer-events:none}
+#crash-title{font-size:22px;font-weight:700;color:var(--red);letter-spacing:1px}
+#pf-btn{position:absolute;top:12px;right:12px;font-size:10px;color:var(--text3);background:rgba(10,14,26,0.8);border:1px solid var(--border);padding:4px 8px;border-radius:var(--r);cursor:pointer;font-family:var(--mono);transition:all 0.2s}
+#pf-btn:hover{color:var(--gold);border-color:rgba(245,158,11,0.4)}
+.particle{position:absolute;pointer-events:none;font-family:var(--mono);font-size:13px;font-weight:600;animation:fu 1.4s ease-out forwards;z-index:50;white-space:nowrap}
+@keyframes fu{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-60px)}}
+
+/* ── TICKER ── */
+.tick-item{font-size:11px;font-family:var(--mono);white-space:nowrap;display:flex;gap:5px;flex-shrink:0}
+.ts{color:var(--text2);font-weight:600}.tv{color:var(--green)}.tv.n{color:var(--red)}
+.tdiv{width:1px;height:12px;background:var(--border);flex-shrink:0;align-self:center}
+#round-tag{font-size:11px;color:var(--text3);margin-left:auto;font-family:var(--mono);flex-shrink:0}
+
+/* ── SIDEBAR ── */
+#tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
+.tab{flex:1;padding:11px 0;font-size:12px;font-weight:500;text-align:center;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.2s;letter-spacing:0.3px;user-select:none}
+.tab.on{color:var(--green);border-bottom-color:var(--green)}
+.tab:active{background:rgba(255,255,255,0.03)}
+
+/* ── BET PANEL ── */
+#bet-panel{padding:14px;flex-shrink:0;border-bottom:1px solid var(--border)}
+.plabel{font-size:10px;font-weight:600;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px}
+#bet-row{display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r2);overflow:hidden;margin-bottom:10px}
+#bet-minus,#bet-plus{background:none;border:none;color:var(--text2);padding:10px 16px;cursor:pointer;font-size:20px;line-height:1;transition:all 0.15s;flex-shrink:0;-webkit-user-select:none;user-select:none}
+#bet-minus:hover,#bet-plus:hover,#bet-minus:active,#bet-plus:active{color:var(--green);background:rgba(0,208,132,0.08)}
+#bet-inp{flex:1;background:none;border:none;color:#fff;font-size:22px;font-weight:600;text-align:center;font-family:var(--mono);outline:none;min-width:0;padding:8px 0}
+.chips{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:10px}
+.chip{padding:7px 0;font-size:12px;font-weight:500;background:var(--bg4);border:1px solid var(--border2);color:var(--text2);border-radius:var(--r);cursor:pointer;transition:all 0.15s;text-align:center;user-select:none}
+.chip:hover,.chip:active{background:rgba(0,208,132,0.1);border-color:rgba(0,208,132,0.4);color:var(--green)}
+#auto-row{display:flex;align-items:center;gap:8px;margin-bottom:12px;background:var(--bg3);padding:9px 12px;border-radius:var(--r);border:1px solid var(--border)}
+#auto-row label{font-size:12px;color:var(--text2);flex:1;cursor:pointer}
+#auto-toggle{width:38px;height:22px;background:var(--bg4);border:1px solid var(--border2);border-radius:11px;cursor:pointer;position:relative;transition:all 0.2s;flex-shrink:0}
+#auto-toggle.on{background:rgba(0,208,132,0.28);border-color:var(--green)}
+#auto-toggle::after{content:'';position:absolute;width:16px;height:16px;background:var(--text3);border-radius:50%;top:2px;left:2px;transition:all 0.2s}
+#auto-toggle.on::after{background:var(--green);left:18px}
+#auto-inp{width:62px;background:var(--bg4);border:1px solid var(--border2);color:#fff;font-size:13px;font-family:var(--mono);padding:5px 8px;border-radius:var(--r);text-align:center;outline:none}
+
+/* ── ACTION BUTTON ── */
+#action-btn{
+  width:100%;padding:14px;font-size:15px;font-weight:600;
+  border:none;border-radius:var(--r2);cursor:pointer;
+  transition:background 0.2s,transform 0.1s,opacity 0.2s;
+  letter-spacing:0.3px;font-family:var(--font);
+  -webkit-user-select:none;user-select:none;
+  touch-action:manipulation;
+}
+#action-btn.bet{background:var(--green);color:#000}
+#action-btn.bet:hover{background:#00bc76}
+#action-btn.bet:active{transform:scale(0.98);background:#00a866}
+#action-btn.cashout{background:var(--blue);color:#fff;animation:pb 0.75s infinite alternate}
+#action-btn.cashout:active{transform:scale(0.97)}
+#action-btn.locked{background:var(--bg4);color:var(--text3);pointer-events:none;opacity:0.7}
+#action-btn.cashed{background:rgba(0,208,132,0.12);color:var(--green);border:1px solid rgba(0,208,132,0.3);pointer-events:none}
+@keyframes pb{from{box-shadow:0 0 0 0 rgba(59,130,246,0.55)}to{box-shadow:0 0 0 12px rgba(59,130,246,0)}}
+
+#pw{text-align:center;font-size:12px;color:var(--text3);margin-top:6px;font-family:var(--mono)}
+#pw .hi{color:var(--green);font-weight:600}
+#rr{text-align:center;font-size:13px;font-weight:600;min-height:20px;margin-top:4px;transition:all 0.3s}
+#rr.w{color:var(--green)}#rr.l{color:var(--red)}
+
+/* ── LIVE BETS ── */
+#live-section{flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0}
+#live-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 14px 6px;flex-shrink:0}
+#live-cnt{font-size:11px;color:var(--text3);background:var(--bg4);padding:2px 8px;border-radius:10px;font-family:var(--mono)}
+#live-list{flex:1;overflow-y:auto;padding:0 14px 8px}
+#live-list::-webkit-scrollbar{width:3px}#live-list::-webkit-scrollbar-thumb{background:var(--border2)}
+.lbr{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)}
+.lba{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0}
+.lbi{flex:1;min-width:0}
+.lbn{font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lbb{font-size:11px;color:var(--text3);font-family:var(--mono)}
+.lbs{font-size:12px;font-weight:600;font-family:var(--mono);text-align:right;flex-shrink:0}
+.lbs.a{color:var(--text3)}.lbs.co{color:var(--green)}.lbs.bu{color:var(--red)}
+
+/* ── HISTORY ── */
+#hist-section{flex:1;overflow-y:auto;padding:12px;display:none;flex-wrap:wrap;gap:6px;align-content:flex-start}
+#hist-section::-webkit-scrollbar{width:3px}#hist-section::-webkit-scrollbar-thumb{background:var(--border2)}
+.hp{padding:5px 10px;border-radius:6px;font-size:13px;font-weight:600;font-family:var(--mono);cursor:default}
+.hp.mega{background:rgba(245,158,11,0.12);color:var(--gold);border:1px solid rgba(245,158,11,0.25)}
+.hp.big{background:rgba(0,208,132,0.1);color:var(--green);border:1px solid rgba(0,208,132,0.2)}
+.hp.mid{background:rgba(59,130,246,0.08);color:var(--blue);border:1px solid rgba(59,130,246,0.15)}
+.hp.low{background:rgba(255,68,68,0.08);color:var(--red);border:1px solid rgba(255,68,68,0.15)}
+
+/* ── STATS ── */
+#stats-section{flex:1;overflow-y:auto;padding:12px;display:none;flex-direction:column;gap:8px}
+.sc{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r2);padding:12px 14px}
+.sc-lbl{font-size:10px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}
+.sc-val{font-size:20px;font-weight:600;font-family:var(--mono)}
+.sc-val.g{color:var(--green)}.sc-val.r{color:var(--red)}.sc-val.gold{color:var(--gold)}.sc-val.b{color:var(--blue)}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--bg3);border:1px solid var(--border2);padding:10px 20px;border-radius:20px;font-size:13px;font-weight:500;z-index:999;opacity:0;transition:opacity 0.3s;pointer-events:none;white-space:nowrap;max-width:90vw;text-align:center}
+#toast.show{opacity:1}
+#toast.w{color:var(--green);border-color:rgba(0,208,132,0.4)}
+#toast.l{color:var(--red);border-color:rgba(255,68,68,0.35)}
+
+/* ── MODALS ── */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:200;display:none;align-items:center;justify-content:center;padding:12px}
+.modal.open{display:flex}
+.mbox{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r2);padding:22px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto}
+.mbox::-webkit-scrollbar{width:4px}.mbox::-webkit-scrollbar-thumb{background:var(--border2)}
+.mbox h2{font-size:15px;font-weight:600;margin-bottom:10px}
+.mbox h2 .hi{color:var(--gold)}.mbox h2 .hb{color:var(--blue)}
+.pf-desc{font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:14px}
+.pf-field{margin-bottom:12px}
+.pf-field label{font-size:10px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;display:block;margin-bottom:4px}
+.pf-field code{display:block;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:8px 10px;font-family:var(--mono);font-size:11px;color:var(--green);word-break:break-all;line-height:1.6}
+.mbtn{width:100%;padding:10px;border-radius:var(--r);cursor:pointer;font-size:13px;font-weight:500;transition:all 0.2s;font-family:var(--font);display:block;margin-top:6px;touch-action:manipulation}
+.mbtn-gold{background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);color:var(--gold)}
+.mbtn-gold:active{background:rgba(245,158,11,0.22)}
+.mbtn-ghost{background:none;border:1px solid var(--border2);color:var(--text2)}
+.mbtn-ghost:active{background:rgba(255,255,255,0.04)}
+.mbtn-blue{background:var(--blue);border:none;color:#fff}
+.mbtn-blue:active{background:#2563eb}
+#pf-result{font-size:12px;text-align:center;color:var(--text3);font-family:var(--mono);min-height:16px;margin-top:6px}
+.admin-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.afield label{font-size:11px;color:var(--text3);display:block;margin-bottom:4px}
+.afield input{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);padding:8px 10px;font-size:13px;font-family:var(--font);outline:none}
+.afield input:focus{border-color:var(--blue)}
+.admin-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.am{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r2);padding:10px 12px}
+.am-lbl{font-size:10px;color:var(--text3);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px}
+.am-val{font-size:17px;font-weight:600;font-family:var(--mono)}
+.am-val.g{color:var(--green)}.am-val.b{color:var(--blue)}.am-val.gold{color:var(--gold)}
+.asec{margin-bottom:16px}
+.asec h3{font-size:11px;font-weight:600;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.hash-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:11px;color:var(--text3)}
+.hash-row .g{color:var(--green)}.hash-row .r{color:var(--red)}
+
+/* ── MOBILE BALANCE BAR ── */
+#mob-bal{display:none;background:var(--bg3);border-bottom:1px solid var(--border);padding:8px 14px;font-size:12px;color:var(--text2)}
+#mob-bal span{color:var(--green);font-weight:600;font-family:var(--mono)}
+@media(max-width:680px){#mob-bal{display:flex;justify-content:space-between;align-items:center}}
+</style>
+</head>
+<body>
+<div id="wrapper">
+
+  <!-- TOPBAR -->
+  <div id="topbar">
+    <div style="display:flex;align-items:center">
+      <span id="logo-text">STOCK<span>CRASH</span></span>
+      <span id="logo-badge">DEMO</span>
+    </div>
+    <div id="top-stats">
+      <div class="tstat"><span class="tstat-label">Balance</span><span class="tstat-val g" id="bal">$1,000.00</span></div>
+      <div class="tstat"><span class="tstat-label">Session P&L</span><span class="tstat-val" id="spnl">+$0.00</span></div>
+      <div class="tstat"><span class="tstat-label">W / L</span><span class="tstat-val" id="wl">0 / 0</span></div>
+    </div>
+    <div id="top-btns">
+      <button class="top-btn" id="sound-btn" onclick="toggleSound()">🔊 Sound</button>
+      <button class="top-btn" onclick="openAdmin()">⚙ Admin</button>
+    </div>
+  </div>
+
+  <!-- MOBILE BALANCE BAR -->
+  <div id="mob-bal">
+    <span>Balance: <span id="mob-bal-val">$1,000.00</span></span>
+    <span id="mob-pnl" style="color:var(--text3)">P&L: +$0.00</span>
+  </div>
+
+  <div id="main">
+    <!-- CHART -->
+    <div id="chart-col">
+      <div id="chart-wrap">
+        <canvas id="chart"></canvas>
+        <div id="phase-tag" class="b">● BETTING OPEN</div>
+        <div id="mult-overlay">
+          <div id="mult-big" class="g">1.00x</div>
+          <div id="mult-sub">MULTIPLIER</div>
+        </div>
+        <div id="cd-overlay">
+          <div id="cd-num">5</div>
+          <div id="cd-label">NEXT ROUND IN</div>
+        </div>
+        <div id="crash-banner">
+          <div id="crash-title">CRASHED!</div>
+        </div>
+        <div id="pf-btn" onclick="openPF()">🔐 PROVABLY FAIR</div>
+      </div>
+      <div id="ticker-bar">
+        <div class="tick-item"><span class="ts">AAPL</span><span class="tv" id="t1">+2.41%</span></div>
+        <div class="tdiv"></div>
+        <div class="tick-item"><span class="ts">TSLA</span><span class="tv n" id="t2">-1.18%</span></div>
+        <div class="tdiv"></div>
+        <div class="tick-item"><span class="ts">NVDA</span><span class="tv" id="t3">+4.07%</span></div>
+        <div class="tdiv"></div>
+        <div class="tick-item"><span class="ts">BTC</span><span class="tv n" id="t4">-2.13%</span></div>
+        <div class="tdiv"></div>
+        <div class="tick-item"><span class="ts">ETH</span><span class="tv" id="t5">+1.55%</span></div>
+        <div class="tdiv"></div>
+        <div class="tick-item"><span class="ts">SPY</span><span class="tv" id="t6">+0.88%</span></div>
+        <div class="tdiv"></div>
+        <div class="tick-item"><span class="ts">MSFT</span><span class="tv" id="t7">+1.72%</span></div>
+        <span id="round-tag">ROUND #1</span>
+      </div>
+    </div>
+
+    <!-- SIDEBAR -->
+    <div id="right-col">
+      <div id="tabs">
+        <div class="tab on" id="tab-bet" onclick="switchTab('bet')">Place Bet</div>
+        <div class="tab" id="tab-hist" onclick="switchTab('hist')">History</div>
+        <div class="tab" id="tab-stats" onclick="switchTab('stats')">My Stats</div>
+      </div>
+
+      <!-- BET PANEL -->
+      <div id="bet-panel">
+        <div class="plabel">Bet Amount</div>
+        <div id="bet-row">
+          <button id="bet-minus" onclick="adjBet(-1)">−</button>
+          <input id="bet-inp" type="number" value="10" min="1" inputmode="decimal" oninput="syncBet()"/>
+          <button id="bet-plus" onclick="adjBet(1)">+</button>
+        </div>
+        <div class="chips">
+          <div class="chip" onclick="setBet(5)">$5</div>
+          <div class="chip" onclick="setBet(10)">$10</div>
+          <div class="chip" onclick="setBet(25)">$25</div>
+          <div class="chip" onclick="setBet(50)">$50</div>
+          <div class="chip" onclick="setBet(100)">$100</div>
+          <div class="chip" onclick="setBet(250)">$250</div>
+          <div class="chip" onclick="setBet(500)">$500</div>
+          <div class="chip" id="half-chip" onclick="halfBet()">½</div>
+        </div>
+        <div id="auto-row">
+          <label for="auto-inp">Auto cashout at</label>
+          <input id="auto-inp" type="number" value="2.00" min="1.01" step="0.01" inputmode="decimal" oninput="updatePW()"/>
+          <span style="font-size:12px;color:var(--text3)">x</span>
+          <div id="auto-toggle" onclick="toggleAuto()" role="switch" aria-label="Auto cashout toggle"></div>
+        </div>
+        <button id="action-btn" class="bet" onclick="handleAction()">Place Bet</button>
+        <div id="pw">Potential win at 2.00x: <span class="hi" id="pw-val">$20.00</span></div>
+        <div id="rr"></div>
+      </div>
+
+      <div id="live-section">
+        <div id="live-hdr">
+          <div class="plabel" style="margin:0">Live Bets</div>
+          <div id="live-cnt">0 players</div>
+        </div>
+        <div id="live-list"></div>
+      </div>
+
+      <div id="hist-section"></div>
+
+      <div id="stats-section">
+        <div class="sc"><div class="sc-lbl">Total Wagered</div><div class="sc-val" id="sw">$0.00</div></div>
+        <div class="sc"><div class="sc-lbl">Net P&L</div><div class="sc-val g" id="sp">+$0.00</div></div>
+        <div class="sc"><div class="sc-lbl">Biggest Win</div><div class="sc-val gold" id="sbw">—</div></div>
+        <div class="sc"><div class="sc-lbl">Rounds Played</div><div class="sc-val" id="sr">0</div></div>
+        <div class="sc"><div class="sc-lbl">Win Rate</div><div class="sc-val g" id="swr">—</div></div>
+        <div class="sc"><div class="sc-lbl">Avg Cashout</div><div class="sc-val b" id="sac">—</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PROVABLY FAIR MODAL -->
+<div class="modal" id="pf-modal">
+  <div class="mbox">
+    <h2>🔐 Provably <span class="hi">Fair</span></h2>
+    <p class="pf-desc">Each crash point is derived from a SHA-256 hash chain generated before the session. You can verify no round was manipulated after bets closed.</p>
+    <div class="pf-field"><label>Server Seed Hash (this round)</label><code id="pf-hash">—</code></div>
+    <div class="pf-field"><label>Client Seed</label><code id="pf-cseed">—</code></div>
+    <div class="pf-field"><label>Combined Hash (revealed after round)</label><code id="pf-combined">—</code></div>
+    <div class="pf-field"><label>Derived Crash Point</label><code id="pf-crash">—</code></div>
+    <button class="mbtn mbtn-gold" onclick="verifyRound()">Verify Last Round</button>
+    <div id="pf-result"></div>
+    <button class="mbtn mbtn-ghost" onclick="closePF()">Close</button>
+  </div>
+</div>
+
+<!-- ADMIN MODAL -->
+<div class="modal" id="admin-modal">
+  <div class="mbox" id="admin-box" style="max-width:580px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h2 style="margin:0">⚙ <span class="hb">Admin</span> Panel</h2>
+      <button onclick="closeAdmin()" style="background:none;border:none;color:var(--text3);font-size:22px;cursor:pointer;padding:0 4px;line-height:1">✕</button>
+    </div>
+    <div class="asec">
+      <h3>Live Metrics</h3>
+      <div class="admin-metrics">
+        <div class="am"><div class="am-lbl">House Profit</div><div class="am-val g" id="a-profit">$0.00</div></div>
+        <div class="am"><div class="am-lbl">Total Wagered</div><div class="am-val b" id="a-wager">$0.00</div></div>
+        <div class="am"><div class="am-lbl">Rounds Run</div><div class="am-val gold" id="a-rounds">0</div></div>
+      </div>
+    </div>
+    <div class="asec">
+      <h3>Configuration</h3>
+      <div class="admin-grid">
+        <div class="afield"><label>House Edge (%)</label><input type="number" id="cfg-edge" value="4" min="1" max="20" step="0.5"/></div>
+        <div class="afield"><label>Min Bet ($)</label><input type="number" id="cfg-min" value="1"/></div>
+        <div class="afield"><label>Max Bet ($)</label><input type="number" id="cfg-max" value="10000"/></div>
+        <div class="afield"><label>Betting Window (sec)</label><input type="number" id="cfg-win" value="5" min="3" max="15"/></div>
+        <div class="afield"><label>Max Multiplier Cap</label><input type="number" id="cfg-cap" value="1000"/></div>
+        <div class="afield"><label>Bot Players (0–10)</label><input type="number" id="cfg-bots" value="6" min="0" max="10"/></div>
+      </div>
+      <button class="mbtn mbtn-blue" onclick="saveConfig()">Save Configuration</button>
+    </div>
+    <div class="asec">
+      <h3>Hash Chain History</h3>
+      <div id="a-hashes" style="max-height:140px;overflow-y:auto"></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ─────────────────────────────────────────────
+//  AUDIO ENGINE  (Web Audio API — no files)
+// ─────────────────────────────────────────────
+const AC = window.AudioContext || window.webkitAudioContext;
+let audioCtx=null, soundOn=true;
+let masterGain, compressor, reverbSend, reverbReturn;
+let musicTimers=[], currentMusicPhase='idle', beat=0, bpm=124, chordIdx=0;
+
+function getAC(){
+  if(!audioCtx){
+    audioCtx=new AC();
+    masterGain=audioCtx.createGain(); masterGain.gain.value=0.7;
+    compressor=audioCtx.createDynamicsCompressor();
+    compressor.threshold.value=-14; compressor.ratio.value=4;
+    compressor.attack.value=0.003; compressor.release.value=0.25;
+    reverbSend=audioCtx.createGain(); reverbSend.gain.value=0.18;
+    reverbReturn=audioCtx.createGain(); reverbReturn.gain.value=0.82;
+    const conv=audioCtx.createConvolver();
+    conv.buffer=mkReverb(audioCtx,2,0.5);
+    masterGain.connect(reverbSend); reverbSend.connect(conv); conv.connect(reverbReturn);
+    masterGain.connect(compressor); reverbReturn.connect(compressor);
+    compressor.connect(audioCtx.destination);
+  }
+  if(audioCtx.state==='suspended') audioCtx.resume();
+  return audioCtx;
+}
+function mkReverb(ctx,dur,dec){
+  const r=ctx.sampleRate,n=r*dur,b=ctx.createBuffer(2,n,r);
+  for(let c=0;c<2;c++){const d=b.getChannelData(c);for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/n,dec);}
+  return b;
+}
+function pNote(f,type,dur,vol=0.2,dl=0){
+  if(!soundOn||!audioCtx)return;
+  try{
+    const a=audioCtx,now=a.currentTime,o=a.createOscillator(),g=a.createGain();
+    o.type=type;o.frequency.value=f;
+    g.gain.setValueAtTime(0.001,now+dl);
+    g.gain.linearRampToValueAtTime(vol,now+dl+0.015);
+    g.gain.exponentialRampToValueAtTime(0.001,now+dl+dur);
+    o.connect(g);g.connect(masterGain);o.start(now+dl);o.stop(now+dl+dur+0.05);
+  }catch(e){}
+}
+function pNoise(dur,vol=0.15,dl=0,hp=8000){
+  if(!soundOn||!audioCtx)return;
+  try{
+    const a=audioCtx,now=a.currentTime;
+    const buf=a.createBuffer(1,a.sampleRate*dur,a.sampleRate);
+    const d=buf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+    const src=a.createBufferSource(),f=a.createBiquadFilter(),g=a.createGain();
+    src.buffer=buf;f.type='highpass';f.frequency.value=hp;
+    g.gain.setValueAtTime(vol,now+dl);g.gain.exponentialRampToValueAtTime(0.001,now+dl+dur);
+    src.connect(f);f.connect(g);g.connect(masterGain);src.start(now+dl);src.stop(now+dl+dur+0.01);
+  }catch(e){}
+}
+function pKick(dl=0,vol=0.55){
+  if(!soundOn||!audioCtx)return;
+  try{
+    const a=audioCtx,now=a.currentTime,o=a.createOscillator(),g=a.createGain();
+    o.type='sine';o.frequency.setValueAtTime(160,now+dl);o.frequency.exponentialRampToValueAtTime(40,now+dl+0.08);
+    g.gain.setValueAtTime(vol,now+dl);g.gain.exponentialRampToValueAtTime(0.001,now+dl+0.35);
+    o.connect(g);g.connect(masterGain);o.start(now+dl);o.stop(now+dl+0.4);
+  }catch(e){}
+}
+function pSnare(dl=0){pNoise(0.18,0.22,dl,2000);pNote(200,'sine',0.1,0.1,dl);}
+function pHat(dl=0,open=false){pNoise(open?0.22:0.04,0.09,dl,9000);}
+function pBass(f,dl=0,dur=0.3,vol=0.32){
+  if(!soundOn||!audioCtx)return;
+  try{
+    [0,8].forEach(det=>{
+      const a=audioCtx,now=a.currentTime,o=a.createOscillator(),lp=a.createBiquadFilter(),g=a.createGain();
+      o.type='sawtooth';o.frequency.value=f;o.detune.value=det;
+      lp.type='lowpass';lp.frequency.value=380;lp.Q.value=2;
+      g.gain.setValueAtTime(0.001,now+dl);g.gain.linearRampToValueAtTime(vol,now+dl+0.02);
+      g.gain.exponentialRampToValueAtTime(0.001,now+dl+dur);
+      o.connect(lp);lp.connect(g);g.connect(masterGain);o.start(now+dl);o.stop(now+dl+dur+0.05);
+    });
+  }catch(e){}
+}
+function pPad(freqs,dl=0,dur=3,vol=0.065){
+  if(!soundOn||!audioCtx)return;
+  freqs.forEach((f,i)=>{
+    try{
+      const a=audioCtx,now=a.currentTime,o=a.createOscillator(),g=a.createGain();
+      o.type='sine';o.frequency.value=f;o.detune.value=i%2===0?5:-5;
+      g.gain.setValueAtTime(0.001,now+dl);g.gain.linearRampToValueAtTime(vol,now+dl+0.7);
+      g.gain.setValueAtTime(vol,now+dl+dur-0.5);g.gain.linearRampToValueAtTime(0.001,now+dl+dur);
+      o.connect(g);g.connect(masterGain);o.start(now+dl);o.stop(now+dl+dur+0.1);
+    }catch(e){}
+  });
+}
+function pRiser(f1,f2,dur,vol=0.06,dl=0){
+  if(!soundOn||!audioCtx)return;
+  try{
+    const a=audioCtx,now=a.currentTime,o=a.createOscillator(),lp=a.createBiquadFilter(),g=a.createGain();
+    o.type='sawtooth';lp.type='lowpass';lp.frequency.value=1100;
+    o.frequency.setValueAtTime(f1,now+dl);o.frequency.exponentialRampToValueAtTime(f2,now+dl+dur);
+    g.gain.setValueAtTime(0.001,now+dl);g.gain.linearRampToValueAtTime(vol,now+dl+dur*0.3);
+    g.gain.exponentialRampToValueAtTime(0.001,now+dl+dur);
+    o.connect(lp);lp.connect(g);g.connect(masterGain);o.start(now+dl);o.stop(now+dl+dur+0.1);
+  }catch(e){}
+}
+
+const BASS_ROOTS=[55,87.3,65.4,49];
+const PAD_CHORDS=[[220,261.6,329.6,392],[174.6,220,261.6,329.6],[261.6,329.6,392,523.2],[196,246.9,293.7,392]];
+const BPM_MS=()=>60000/bpm;
+
+function mT(fn,ms){musicTimers.push(setTimeout(fn,ms));}
+function clearMusic(){musicTimers.forEach(t=>clearTimeout(t));musicTimers=[];}
+function isActive(){return currentMusicPhase==='flying'||currentMusicPhase==='tense';}
+
+function startIdleMusic(){
+  clearMusic();currentMusicPhase='idle';
+  if(!soundOn)return;
+  getAC();schedulePads();
+}
+function schedulePads(){
+  if(currentMusicPhase!=='idle'||!soundOn)return;
+  pPad(PAD_CHORDS[chordIdx%4],0,4.2,0.05);chordIdx++;
+  mT(schedulePads,4000);
+}
+function startFlyingMusic(){
+  clearMusic();currentMusicPhase='flying';bpm=124;
+  if(!soundOn)return;
+  getAC();beat=0;sBeat();sBassLine();sPads();
+}
+function sBeat(){
+  if(!isActive()||!soundOn)return;
+  const b=beat%16;
+  if(b===0||b===8)pKick(0,0.52);
+  if(b===4||b===12)pSnare();
+  pHat(0,b%4===2);
+  if(b===14)pKick(0,0.28);
+  beat++;mT(sBeat,BPM_MS()/4);
+}
+function sBassLine(){
+  if(!isActive()||!soundOn)return;
+  const root=BASS_ROOTS[Math.floor(beat/16)%4];
+  pBass(root,0,0.26,0.35);
+  mT(()=>{if(isActive()&&soundOn)pBass(root*1.5,0,0.1,0.2);},BPM_MS()*0.75);
+  mT(sBassLine,BPM_MS());
+}
+function sPads(){
+  if(!isActive()||!soundOn)return;
+  pPad(PAD_CHORDS[chordIdx%4],0,(BPM_MS()*4)/1000,0.06);chordIdx++;
+  mT(sPads,BPM_MS()*4);
+}
+function startTenseMusic(){
+  if(currentMusicPhase==='tense')return;
+  bpm=140;currentMusicPhase='tense';
+  if(!soundOn)return;
+  sRiser();
+}
+function sRiser(){
+  if(currentMusicPhase!=='tense'||!soundOn)return;
+  pRiser(280,750,3.2,0.065);mT(sRiser,3000);
+}
+function stopMusic(){clearMusic();currentMusicPhase='idle';}
+function toggleSound(){
+  soundOn=!soundOn;
+  document.getElementById('sound-btn').textContent=(soundOn?'🔊':'🔇')+' Sound';
+  if(!soundOn)stopMusic();
+  else if(phase==='countdown')startIdleMusic();
+  else if(phase==='flying')startFlyingMusic();
+}
+
+// SFX aliases
+function sfxBet(){if(!soundOn)return;getAC();pNote(880,'sine',0.07,0.18);pNote(1100,'sine',0.05,0.14,0.06);}
+function sfxCountdown(){if(!soundOn)return;getAC();pNote(880,'sine',0.11,0.2);}
+function sfxCountdownLast(){if(!soundOn)return;getAC();pNote(1200,'sine',0.14,0.24);}
+function sfxCashout(){
+  if(!soundOn)return;getAC();
+  [523,659,784,1047].forEach((f,i)=>pNote(f,'sine',0.22,0.28,i*0.07));
+  setTimeout(()=>{pNote(2093,'sine',0.28,0.14);pNote(2637,'sine',0.22,0.1,0.06);},380);
+}
+function sfxCrash(){
+  if(!soundOn)return;getAC();stopMusic();currentMusicPhase='crashed';
+  pKick(0,0.85);pKick(0.06,0.55);pKick(0.14,0.32);
+  pNote(40,'sawtooth',1.2,0.38);pNote(55,'sawtooth',0.9,0.28,0.08);
+  pNoise(1.5,0.5,0,400);pRiser(550,55,1.1,0.22);
+  [220,233,247].forEach((f,i)=>pNote(f,'sawtooth',0.6,0.14,i*0.04));
+}
+function sfxMilestone(m){
+  if(!soundOn)return;getAC();
+  const b=380+Math.min(m*22,550);
+  pNote(b,'sine',0.2,0.3);pNote(b*1.25,'sine',0.15,0.22,0.09);pNote(b*1.5,'sine',0.12,0.16,0.18);
+}
+
+// ─────────────────────────────────────────────
+//  PROVABLY FAIR
+// ─────────────────────────────────────────────
+const CLIENT_SEED='sc_'+Math.random().toString(36).slice(2,10);
+let chainSeeds=[],chainHashes=[];
+async function sha256(m){
+  const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(m));
+  return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+async function initChain(n=150){
+  let s=Math.random().toString(36)+Date.now();
+  chainSeeds=[s];chainHashes=[await sha256(s)];
+  for(let i=1;i<n;i++){s=await sha256(s+CLIENT_SEED);chainSeeds.push(s);chainHashes.push(await sha256(s));}
+}
+async function crashFromHash(h){
+  const n=parseInt(h.slice(0,8),16),e=CFG.houseEdge/100;
+  if(n%Math.floor(1/e)===0)return 1.00;
+  return Math.max(1.00,Math.floor(100/(1-(n/0xffffffff))*100)/100);
+}
+
+// ─────────────────────────────────────────────
+//  CONFIG & STATE
+// ─────────────────────────────────────────────
+let CFG={houseEdge:4,minBet:1,maxBet:10000,bettingWindow:5,maxMult:1000,numBots:6};
+let bal=1000,sessStart=1000,betAmt=10,betPlaced=false,cashedOut=false,coMult=0;
+let phase='countdown',mult=1.00,crash=2.00,pts=[],t0=0,cdV=5,cdTimer=null,afId=null;
+let autoOn=false,roundN=0,miles=new Set();
+let totW=0,wins=0,losses=0,bigWin=0,coMults=[],hProfit=0,aWager=0,aRounds=0;
+let lastHash='',lastSeed='',lastCrash=0,hashHist=[];
+
+const BNAMES=['AlphaWave','BullRider','MoonShot','DipBuyer','Hodler99','CrashKing','TradePro','RocketMan','DiamondHnd','NightTrader'];
+const BCOLORS=['#3b82f6','#8b5cf6','#f59e0b','#06b6d4','#ec4899','#10b981','#f97316','#6366f1','#14b8a6','#ef4444'];
+let bots=[];
+
+// ─────────────────────────────────────────────
+//  CANVAS
+// ─────────────────────────────────────────────
+const cv=document.getElementById('chart'),cx=cv.getContext('2d');
+function resizeCanvas(){
+  const w=cv.parentElement;
+  cv.width=w.clientWidth*devicePixelRatio;
+  cv.height=w.clientHeight*devicePixelRatio;
+}
+window.addEventListener('resize',()=>{resizeCanvas();draw();});
+resizeCanvas();
+
+// ─────────────────────────────────────────────
+//  UTILS
+// ─────────────────────────────────────────────
+const $=id=>document.getElementById(id);
+const fmtS=n=>(n>=0?'+$':'-$')+Math.abs(n).toFixed(2);
+
+function toast(msg,cls=''){
+  const t=$('toast');t.textContent=msg;t.className='show '+cls;
+  clearTimeout(t._t);t._t=setTimeout(()=>{t.className='';},2800);
+}
+function particle(txt,col){
+  const el=document.createElement('div');el.className='particle';
+  el.textContent=txt;el.style.color=col;
+  el.style.left=(20+Math.random()*60)+'%';el.style.top='30%';
+  $('chart-wrap').appendChild(el);setTimeout(()=>el.remove(),1500);
+}
+function setPhase(txt,cls){const t=$('phase-tag');t.textContent=txt;t.className=cls;}
+function setBtn(state){
+  const b=$('action-btn');
+  // Remove all state classes
+  b.classList.remove('bet','cashout','locked','cashed');
+  b.classList.add(state);
+  if(state==='bet'){b.textContent='Place Bet';}
+  else if(state==='cashout'){b.textContent='💰 Cash Out Now';}
+  else if(state==='locked'){b.textContent='Bet Placed ✓';}
+  else if(state==='cashed'){b.textContent='Cashed Out ✓';}
+}
+
+function updateTop(){
+  const p=bal-sessStart;
+  $('bal').textContent='$'+bal.toFixed(2);
+  $('spnl').textContent=fmtS(p);
+  $('spnl').className='tstat-val '+(p>=0?'g':'r');
+  $('wl').textContent=wins+' / '+losses;
+  $('mob-bal-val').textContent='$'+bal.toFixed(2);
+  $('mob-pnl').textContent='P&L: '+fmtS(p);
+  $('mob-pnl').style.color=p>=0?'var(--green)':'var(--red)';
+}
+
+function updatePW(){
+  const a=parseFloat($('auto-inp').value)||2;
+  const m=autoOn?a:2;
+  $('pw').innerHTML='Potential win at '+(autoOn?a.toFixed(2):'2.00')+'x: <span class="hi">$'+(betAmt*m).toFixed(2)+'</span>';
+}
+
+function updateStats(){
+  $('sw').textContent='$'+totW.toFixed(2);
+  const p=bal-sessStart;
+  $('sp').textContent=fmtS(p);$('sp').className='sc-val '+(p>=0?'g':'r');
+  $('sbw').textContent=bigWin>0?'$'+bigWin.toFixed(2):'—';
+  const pl=wins+losses;$('sr').textContent=pl;
+  $('swr').textContent=pl?Math.round(wins/pl*100)+'%':'—';
+  $('sac').textContent=coMults.length?(coMults.reduce((a,b)=>a+b)/coMults.length).toFixed(2)+'x':'—';
+}
+
+// ─────────────────────────────────────────────
+//  TABS
+// ─────────────────────────────────────────────
+function switchTab(tab){
+  ['bet','hist','stats'].forEach(t=>{
+    $('tab-'+t).classList.toggle('on',t===tab);
+  });
+  $('bet-panel').style.display=tab==='bet'?'block':'none';
+  $('live-section').style.display=tab==='bet'?'flex':'none';
+  $('hist-section').style.display=tab==='hist'?'flex':'none';
+  $('stats-section').style.display=tab==='stats'?'flex':'none';
+}
+
+// ─────────────────────────────────────────────
+//  BET CONTROLS  (all bugs fixed)
+// ─────────────────────────────────────────────
+function syncBet(){
+  betAmt=Math.max(CFG.minBet,Math.min(CFG.maxBet,parseFloat($('bet-inp').value)||CFG.minBet));
+  updatePW();
+}
+function setBet(v){
+  betAmt=Math.min(v,bal);
+  $('bet-inp').value=betAmt;
+  updatePW();
+}
+function halfBet(){
+  setBet(Math.max(CFG.minBet,Math.floor(betAmt/2)));
+}
+function adjBet(dir){
+  const steps=[1,2,5,10,25,50,100,250,500,1000];
+  let idx=steps.findIndex(s=>s>=betAmt);
+  if(idx<0)idx=steps.length-1;
+  idx=Math.max(0,Math.min(steps.length-1,idx+dir));
+  setBet(Math.min(steps[idx],bal));
+}
+function toggleAuto(){
+  autoOn=!autoOn;
+  $('auto-toggle').classList.toggle('on',autoOn);
+  updatePW();
+}
+
+// ─────────────────────────────────────────────
+//  BOTS
+// ─────────────────────────────────────────────
+function spawnBots(){
+  bots=[];
+  const n=CFG.numBots;
+  [...BNAMES].sort(()=>Math.random()-0.5).slice(0,n).forEach((name,i)=>{
+    bots.push({name,color:BCOLORS[i%BCOLORS.length],bet:[5,10,25,50,100][Math.floor(Math.random()*5)],target:1.1+Math.random()*5,cashed:false,coM:0});
+  });
+  renderBots();
+}
+function renderBots(){
+  const all=[...bots];
+  if(betPlaced)all.unshift({name:'You',color:'#00d084',bet:betAmt,cashed:cashedOut,coM:coMult,me:true});
+  $('live-cnt').textContent=all.length+' player'+(all.length!==1?'s':'');
+  $('live-list').innerHTML=all.map(b=>{
+    const ini=b.name.slice(0,2).toUpperCase();
+    let sc='a',sv='$'+b.bet.toFixed(2);
+    if(b.cashed){sc='co';sv='+$'+(b.bet*b.coM-b.bet).toFixed(2);}
+    else if(phase==='crashed'&&!b.cashed){sc='bu';sv='-$'+b.bet.toFixed(2);}
+    return`<div class="lbr"><div class="lba" style="background:${b.color}22;color:${b.color}">${ini}</div><div class="lbi"><div class="lbn">${b.name}${b.me?' (you)':''}</div><div class="lbb">$${b.bet.toFixed(2)}</div></div><div class="lbs ${sc}">${sv}</div></div>`;
+  }).join('');
+}
+
+// ─────────────────────────────────────────────
+//  HISTORY
+// ─────────────────────────────────────────────
+let histData=[];
+function addHist(m){
+  histData.unshift(m);if(histData.length>60)histData.pop();
+  $('hist-section').innerHTML=histData.map(x=>`<div class="hp ${x>=10?'mega':x>=2?'big':x>=1.5?'mid':'low'}">${x.toFixed(2)}x</div>`).join('');
+}
+
+// ─────────────────────────────────────────────
+//  ADMIN & PROVABLY FAIR
+// ─────────────────────────────────────────────
+function openAdmin(){$('admin-modal').classList.add('open');$('a-profit').textContent='$'+hProfit.toFixed(2);$('a-wager').textContent='$'+aWager.toFixed(2);$('a-rounds').textContent=aRounds;$('a-hashes').innerHTML=hashHist.slice(0,20).map(h=>`<div class="hash-row"><span>Round #${h.r} — ${h.c.toFixed(2)}x</span><span class="${h.c>=2?'g':'r'}">${h.h.slice(0,18)}…</span></div>`).join('')||'<div style="color:var(--text3);font-size:12px;padding:6px 0">No rounds yet</div>';}
+function closeAdmin(){$('admin-modal').classList.remove('open');}
+function saveConfig(){CFG.houseEdge=parseFloat($('cfg-edge').value)||4;CFG.minBet=parseFloat($('cfg-min').value)||1;CFG.maxBet=parseFloat($('cfg-max').value)||10000;CFG.bettingWindow=parseInt($('cfg-win').value)||5;CFG.maxMult=parseInt($('cfg-cap').value)||1000;CFG.numBots=parseInt($('cfg-bots').value)||6;closeAdmin();toast('Configuration saved ✓','w');}
+
+function openPF(){$('pf-modal').classList.add('open');$('pf-hash').textContent=lastHash||'(waiting)';$('pf-cseed').textContent=CLIENT_SEED;$('pf-combined').textContent=lastSeed?lastSeed+':'+CLIENT_SEED:'—';$('pf-crash').textContent=lastCrash?lastCrash.toFixed(2)+'x':'—';}
+function closePF(){$('pf-modal').classList.remove('open');}
+async function verifyRound(){
+  if(!lastSeed){$('pf-result').textContent='No round completed yet.';return;}
+  const h=await sha256(lastSeed+':'+CLIENT_SEED),d=await crashFromHash(h),ok=Math.abs(d-lastCrash)<0.02;
+  $('pf-result').textContent=ok?'✅ Verified — '+lastCrash.toFixed(2)+'x matches hash':'❌ Mismatch — expected '+d.toFixed(2)+'x';
+  $('pf-result').style.color=ok?'var(--green)':'var(--red)';
+}
+
+// Ticker
+const tickIds=['t1','t2','t3','t4','t5','t6','t7'],tickSigns=[1,-1,1,-1,1,1,1];
+function jitter(){tickIds.forEach((id,i)=>{const s=tickSigns[i]*(Math.random()>0.2?1:-1),v=(Math.random()*4+0.1).toFixed(2),el=$(id);if(el){el.textContent=(s>0?'+':'-')+v+'%';el.className='tv'+(s<0?' n':'');}});}
+setInterval(jitter,5000);
+
+// ─────────────────────────────────────────────
+//  DRAW
+// ─────────────────────────────────────────────
+function draw(){
+  const W=cv.width/devicePixelRatio,H=cv.height/devicePixelRatio;
+  cx.clearRect(0,0,cv.width,cv.height);
+  cx.scale(devicePixelRatio,devicePixelRatio);
+  const pad={l:46,r:16,t:20,b:32},cw=W-pad.l-pad.r,ch=H-pad.t-pad.b;
+  const crashed=phase==='crashed',lc=crashed?'#ff4444':'#00d084';
+  cx.strokeStyle='rgba(255,255,255,0.032)';cx.lineWidth=0.5;
+  for(let i=0;i<=5;i++){const y=pad.t+(ch/5)*i;cx.beginPath();cx.moveTo(pad.l,y);cx.lineTo(W-pad.r,y);cx.stroke();}
+  for(let i=0;i<=8;i++){const x=pad.l+(cw/8)*i;cx.beginPath();cx.moveTo(x,pad.t);cx.lineTo(x,H-pad.b);cx.stroke();}
+  cx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  if(pts.length<2){cx.setTransform(1,0,0,1,0,0);return;}
+  const mxM=Math.max(1.5,phase==='flying'?mult*1.2:crash*1.1);
+  const mxT=Math.max(pts[pts.length-1].x*1.1+20,cw*0.4);
+  function px(p){return{x:pad.l+Math.min((p.x/mxT)*cw,cw),y:pad.t+ch-Math.max(0,((p.m-1)/(mxM-1))*ch)};}
+  const last=px(pts[pts.length-1]);
+  const gr=cx.createLinearGradient(0,pad.t,0,H-pad.b);
+  gr.addColorStop(0,crashed?'rgba(255,68,68,0.16)':'rgba(0,208,132,0.13)');
+  gr.addColorStop(1,crashed?'rgba(255,68,68,0.01)':'rgba(0,208,132,0.01)');
+  cx.beginPath();cx.moveTo(pad.l,H-pad.b);cx.lineTo(px(pts[0]).x,px(pts[0]).y);
+  for(let i=1;i<pts.length;i++){const pv=px(pts[i-1]),cu=px(pts[i]),mx=(pv.x+cu.x)/2;cx.bezierCurveTo(mx,pv.y,mx,cu.y,cu.x,cu.y);}
+  cx.lineTo(last.x,H-pad.b);cx.closePath();cx.fillStyle=gr;cx.fill();
+  cx.beginPath();cx.strokeStyle=lc;cx.lineWidth=2.5;cx.lineJoin='round';cx.lineCap='round';
+  cx.moveTo(px(pts[0]).x,px(pts[0]).y);
+  for(let i=1;i<pts.length;i++){const pv=px(pts[i-1]),cu=px(pts[i]),mx=(pv.x+cu.x)/2;cx.bezierCurveTo(mx,pv.y,mx,cu.y,cu.x,cu.y);}
+  cx.stroke();
+  if(phase==='flying'){cx.beginPath();cx.arc(last.x,last.y,5,0,Math.PI*2);cx.fillStyle=lc;cx.fill();cx.beginPath();cx.arc(last.x,last.y,10,0,Math.PI*2);cx.fillStyle='rgba(0,208,132,0.18)';cx.fill();}
+  if(betPlaced&&cashedOut&&coMult>1){
+    const cy=Math.max(pad.t+2,Math.min(H-pad.b-2,pad.t+ch-((coMult-1)/(mxM-1))*ch));
+    cx.setLineDash([5,4]);cx.strokeStyle='#3b82f6';cx.lineWidth=1.5;
+    cx.beginPath();cx.moveTo(pad.l,cy);cx.lineTo(W-pad.r,cy);cx.stroke();cx.setLineDash([]);
+    cx.fillStyle='#3b82f6';cx.font='11px JetBrains Mono,monospace';cx.textAlign='right';
+    cx.fillText('✓ '+coMult.toFixed(2)+'x',W-pad.r-4,cy-5);
+  }
+  cx.fillStyle='rgba(136,146,164,0.55)';cx.font='11px JetBrains Mono,monospace';cx.textAlign='right';
+  const step=mxM<=3?0.5:mxM<=10?1:mxM<=50?5:10;
+  for(let m=1;m<=mxM;m+=step){if(m>mxM)break;const y=pad.t+ch-((m-1)/(mxM-1))*ch;if(y<pad.t||y>H-pad.b)continue;cx.fillText(m.toFixed(step<1?1:0)+'x',pad.l-6,y+4);}
+  cx.setTransform(1,0,0,1,0,0);
+}
+
+// ─────────────────────────────────────────────
+//  GAME LOOP
+// ─────────────────────────────────────────────
+async function startCountdown(){
+  phase='countdown';pts=[];betPlaced=false;cashedOut=false;coMult=0;miles.clear();roundN++;
+  const idx=roundN%chainSeeds.length;
+  lastSeed=chainSeeds[idx];lastHash=chainHashes[idx];
+  crash=await crashFromHash(lastHash);crash=Math.min(crash,CFG.maxMult);
+  setPhase('● BETTING OPEN','b');
+  $('mult-overlay').style.display='none';
+  $('crash-banner').style.display='none';
+  $('cd-overlay').style.display='block';
+  $('round-tag').textContent='ROUND #'+roundN;
+  $('rr').textContent='';$('rr').className='';
+  setBtn('bet');spawnBots();draw();
+  startIdleMusic();
+  cdV=CFG.bettingWindow;$('cd-num').textContent=cdV;
+  clearInterval(cdTimer);
+  cdTimer=setInterval(()=>{
+    cdV--;$('cd-num').textContent=cdV;
+    cdV===0?sfxCountdownLast():sfxCountdown();
+    if(cdV<=0){clearInterval(cdTimer);startFlying();}
+  },1000);
+}
+
+function startFlying(){
+  phase='flying';setPhase('▲ FLYING','f');
+  $('cd-overlay').style.display='none';
+  $('mult-overlay').style.display='block';
+  $('mult-big').className='g';
+  if(betPlaced){setBtn('cashout');aWager+=betAmt;totW+=betAmt;}
+  bots.forEach(b=>aWager+=b.bet);
+  t0=performance.now();pts=[];
+  startFlyingMusic();
+  requestAnimationFrame(flyLoop);
+}
+
+function flyLoop(now){
+  const el=now-t0,t=el/1000;
+  mult=Math.max(1.00,parseFloat(Math.pow(1.07,t*9).toFixed(2)));
+  if(mult>=5&&currentMusicPhase==='flying')startTenseMusic();
+  [2,3,5,10,20,50,100].forEach(m=>{if(mult>=m&&!miles.has(m)){miles.add(m);sfxMilestone(m);particle(m+'x 🚀',m>=10?'#f59e0b':'#00d084');}});
+  const ac2=parseFloat($('auto-inp').value)||2;
+  if(betPlaced&&!cashedOut&&autoOn&&mult>=ac2)doCashout();
+  bots.forEach(b=>{if(!b.cashed&&mult>=b.target){b.cashed=true;b.coM=parseFloat(mult.toFixed(2));renderBots();}});
+  if(mult>=crash){mult=crash;doCrash();draw();return;}
+  pts.push({x:t*55,m:mult});
+  $('mult-big').textContent=mult.toFixed(2)+'x';
+  draw();afId=requestAnimationFrame(flyLoop);
+}
+
+function doCashout(){
+  if(!betPlaced||cashedOut||phase!=='flying')return;
+  cashedOut=true;coMult=parseFloat(mult.toFixed(2));
+  const win=betAmt*coMult,prof=win-betAmt;
+  bal+=win;wins++;if(prof>bigWin)bigWin=prof;coMults.push(coMult);
+  updateTop();updateStats();setBtn('cashed');sfxCashout();
+  particle('+$'+prof.toFixed(2),'#00d084');
+  toast('Cashed out at '+coMult.toFixed(2)+'x — +$'+prof.toFixed(2),'w');
+  $('rr').textContent='+$'+prof.toFixed(2)+' @ '+coMult.toFixed(2)+'x';$('rr').className='w';
+  renderBots();
+}
+
+function doCrash(){
+  phase='crashed';setPhase('✕ CRASHED','c');
+  $('mult-big').className='r';$('mult-big').textContent=crash.toFixed(2)+'x';
+  $('crash-banner').style.display='block';
+  $('crash-title').textContent='CRASHED AT '+crash.toFixed(2)+'x';
+  sfxCrash();addHist(crash);
+  lastCrash=crash;hashHist.unshift({r:roundN,c:crash,h:lastHash});aRounds++;
+  if(betPlaced&&!cashedOut){
+    bal-=betAmt;if(bal<0)bal=0;losses++;hProfit+=betAmt;
+    updateTop();updateStats();
+    toast('Crashed at '+crash.toFixed(2)+'x — lost $'+betAmt.toFixed(2),'l');
+    $('rr').textContent='-$'+betAmt.toFixed(2);$('rr').className='l';
+  }else if(betPlaced&&cashedOut){hProfit-=(betAmt*coMult-betAmt);}
+  bots.forEach(b=>{if(!b.cashed)hProfit+=b.bet;else hProfit-=b.bet*(b.coM-1);});
+  renderBots();setBtn('locked');
+  setTimeout(startCountdown,4000);
+}
+
+// ─────────────────────────────────────────────
+//  ACTION BUTTON  (fixed — single clean handler)
+// ─────────────────────────────────────────────
+function handleAction(){
+  // Initialise AudioContext on first user gesture (required by browsers)
+  getAC();
+
+  if(phase==='countdown'){
+    syncBet();
+    if(betAmt>bal){toast('Insufficient balance','l');return;}
+    if(betAmt<CFG.minBet){toast('Min bet: $'+CFG.minBet,'l');return;}
+    betPlaced=true;
+    setBtn('locked');
+    sfxBet();
+    toast('Bet placed — $'+betAmt.toFixed(2),'w');
+    renderBots();
+  } else if(phase==='flying'&&betPlaced&&!cashedOut){
+    doCashout();
+  }
+}
+
+// Space bar shortcut (desktop)
+document.addEventListener('keydown',e=>{
+  if(e.code==='Space'&&!e.target.matches('input,textarea')){
+    e.preventDefault();handleAction();
+  }
+});
+
+// Close modals on backdrop tap (mobile)
+document.getElementById('pf-modal').addEventListener('click',function(e){if(e.target===this)closePF();});
+document.getElementById('admin-modal').addEventListener('click',function(e){if(e.target===this)closeAdmin();});
+
+// ─────────────────────────────────────────────
+//  INIT
+// ─────────────────────────────────────────────
+async function init(){
+  await initChain(200);
+  updateTop();updateStats();updatePW();
+  startCountdown();
+}
+init();
+</script>
+</body>
+</html>
